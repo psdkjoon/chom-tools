@@ -1,0 +1,12 @@
+{
+  "id": "stylua",
+  "name": "StyLua",
+  "description": "Lua formatter",
+  "version": "2.0.2",
+  "languages": ["lua"],
+  "exec": "stylua",
+  "format": {
+    "mode": "stdio",
+    "args": ["--search-parent-directories", "--indent-type", "Spaces", "--indent-width", "{tab}", "--stdin-filepath", "{path}", "-"]
+  }
+}

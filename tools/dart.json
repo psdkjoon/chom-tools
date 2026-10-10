@@ -1,0 +1,26 @@
+{
+  "id": "dart",
+  "name": "Dart SDK",
+  "description": "Dart language server and formatter",
+  "version": "3.6.0",
+  "languages": [
+    "dart"
+  ],
+  "exec": "bin/dart",
+  "env": {
+    "PUB_CACHE": "{data}/tools/pub-cache"
+  },
+  "lsp": {
+    "args": [
+      "language-server",
+      "--protocol=lsp"
+    ]
+  },
+  "format": {
+    "mode": "stdio",
+    "args": [
+      "format",
+      "--stdin-name={path}"
+    ]
+  }
+}

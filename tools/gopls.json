@@ -1,0 +1,11 @@
+{
+  "id": "gopls",
+  "name": "gopls",
+  "description": "Go language server and formatter",
+  "version": "0.18.1",
+  "languages": ["go"],
+  "exec": "gopls",
+  "env": {"GOPATH": "{data}/tools/gopath", "GOCACHE": "{tmp}/gocache", "GOTOOLCHAIN": "local"},
+  "lsp": {"args": ["serve"]},
+  "format": {"mode": "lsp"}
+}

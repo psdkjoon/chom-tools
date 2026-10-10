@@ -1,0 +1,113 @@
+name: Build tools
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  NDK_VERSION: "28.2.13676358"
+  ANDROID_HOME: /usr/local/lib/android/sdk
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tool: stylua
+            repo: JohnnyMorganz/StyLua
+            ref: v2.0.2
+            version: 2.0.2
+            crate_args: --features lua54
+            bin: stylua
+          - tool: ruff
+            repo: astral-sh/ruff
+            ref: 0.8.4
+            version: 0.8.4
+            crate_args: -p ruff
+            bin: ruff
+          - tool: biome
+            repo: biomejs/biome
+            ref: cli/v1.9.4
+            version: 1.9.4
+            crate_args: -p biome_cli
+            bin: biome
+          - tool: rust-analyzer
+            repo: rust-lang/rust-analyzer
+            ref: "2024-12-23"
+            version: 2024-12-23
+            crate_args: -p rust-analyzer
+            bin: rust-analyzer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch source
+        run: git clone --depth 1 --branch "${{ matrix.ref }}" "https://github.com/${{ matrix.repo }}.git" src
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - run: cargo install cargo-ndk --locked
+      - name: Build
+        working-directory: src
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: |
+          mkdir -p ../dist
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 --platform 24 build --release ${{ matrix.crate_args }}
+          for pair in arm64-v8a:aarch64-linux-android armeabi-v7a:armv7-linux-androideabi x86_64:x86_64-linux-android; do
+            abi="${pair%%:*}"
+            triple="${pair##*:}"
+            cp "target/$triple/release/${{ matrix.bin }}" "../dist/${{ matrix.tool }}-${{ matrix.version }}-$abi"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.tool }}
+          path: dist/*
+
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build gopls
+        env:
+          GOPLS_VERSION: "0.18.1"
+        run: |
+          mkdir -p dist
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for spec in arm64-v8a:arm64:aarch64-linux-android24-clang: armeabi-v7a:arm:armv7a-linux-androideabi24-clang:GOARM=7 x86_64:amd64:x86_64-linux-android24-clang:; do
+            IFS=: read -r abi goarch cc extra <<<"$spec"
+            rm -rf "$PWD/gp" && mkdir gp
+            env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" GOPATH="$PWD/gp" \
+              go install -buildmode=pie -trimpath -ldflags "-s -w" "golang.org/x/tools/gopls@v$GOPLS_VERSION"
+            cp "$(find gp/bin -type f | head -1)" "dist/gopls-$GOPLS_VERSION-$abi"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-gopls
+          path: dist/*
+
+  publish:
+    needs: [rust, go]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - uses: dart-lang/setup-dart@v1
+      - name: Build manifest
+        run: dart run scripts/make_manifest.dart "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          make_latest: true
+          files: dist/*

@@ -1,0 +1,10 @@
+{
+  "id": "clangd",
+  "name": "clangd",
+  "description": "C and C++ language server and formatter",
+  "version": "19.1.2",
+  "languages": ["cpp"],
+  "exec": "bin/clangd",
+  "lsp": {"args": ["--background-index=false", "--clang-tidy=false"]},
+  "format": {"mode": "lsp"}
+}

@@ -1,0 +1,9 @@
+{
+  "id": "lua-language-server",
+  "name": "Lua Language Server",
+  "description": "Lua language server",
+  "version": "3.13.4",
+  "languages": ["lua"],
+  "exec": "bin/lua-language-server",
+  "lsp": {"args": ["--logpath={tmp}", "--metapath={tmp}"]}
+}

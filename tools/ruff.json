@@ -1,0 +1,10 @@
+{
+  "id": "ruff",
+  "name": "Ruff",
+  "description": "Python language server and formatter",
+  "version": "0.8.4",
+  "languages": ["python"],
+  "exec": "ruff",
+  "lsp": {"args": ["server"]},
+  "format": {"mode": "stdio", "args": ["format", "--stdin-filename", "{path}", "-"]}
+}
