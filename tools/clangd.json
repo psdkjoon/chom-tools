@@ -2,9 +2,22 @@
   "id": "clangd",
   "name": "clangd",
   "description": "C and C++ language server and formatter",
-  "version": "19.1.2",
-  "languages": ["cpp"],
+  "version": "19.1.7",
+  "languages": [
+    "cpp"
+  ],
   "exec": "bin/clangd",
-  "lsp": {"args": ["--background-index=false", "--clang-tidy=false"]},
-  "format": {"mode": "lsp"}
+  "lsp": {
+    "args": [
+      "--background-index=false",
+      "--clang-tidy=false"
+    ]
+  },
+  "format": {
+    "mode": "lsp"
+  },
+  "env": {
+    "CPLUS_INCLUDE_PATH": "{tool}/sysroot/include/c++/v1:{tool}/sysroot/include/aarch64-linux-android:{tool}/sysroot/include",
+    "C_INCLUDE_PATH": "{tool}/sysroot/include/aarch64-linux-android:{tool}/sysroot/include"
+  }
 }

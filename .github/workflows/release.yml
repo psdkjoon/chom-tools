@@ -15,10 +15,12 @@ env:
 jobs:
   rust:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
+        tool: [stylua, ruff, biome, rust-analyzer]
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
         include:
           - tool: stylua
             repo: JohnnyMorganz/StyLua
@@ -44,13 +46,17 @@ jobs:
             version: 2024-12-23
             crate_args: -p rust-analyzer
             bin: rust-analyzer
+          - abi: arm64-v8a
+            triple: aarch64-linux-android
+          - abi: armeabi-v7a
+            triple: armv7-linux-androideabi
+          - abi: x86_64
+            triple: x86_64-linux-android
     steps:
       - uses: actions/checkout@v4
       - name: Fetch source
         run: git clone --depth 1 --branch "${{ matrix.ref }}" "https://github.com/${{ matrix.repo }}.git" src
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - name: Install NDK
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
@@ -58,9 +64,9 @@ jobs:
           "$sdkmanager" "ndk;$NDK_VERSION"
           test -d "$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
       - run: cargo install cargo-ndk --locked
-      - name: Add Android targets to the source toolchain
+      - name: Add the Android target to the source toolchain
         working-directory: src
-        run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+        run: rustup target add ${{ matrix.triple }}
       - name: Build
         working-directory: src
         env:
@@ -74,11 +80,11 @@ jobs:
           mkdir -p ../dist "$RUNNER_TEMP/libgcc"
           echo "INPUT(-lunwind)" > "$RUNNER_TEMP/libgcc/libgcc.a"
           export RUSTFLAGS="-L $RUNNER_TEMP/libgcc --cap-lints warn"
-          cargo ndk -t arm64-v8a --platform 24 build --release ${{ matrix.crate_args }}
-          cp "target/aarch64-linux-android/release/${{ matrix.bin }}" "../dist/${{ matrix.tool }}-${{ matrix.version }}-arm64-v8a"
+          cargo ndk -t ${{ matrix.abi }} --platform 24 build --release ${{ matrix.crate_args }}
+          cp "target/${{ matrix.triple }}/release/${{ matrix.bin }}" "../dist/${{ matrix.tool }}-${{ matrix.version }}-${{ matrix.abi }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.tool }}
+          name: dist-${{ matrix.tool }}-${{ matrix.abi }}
           path: dist/*
 
   go:
@@ -112,8 +118,74 @@ jobs:
           name: dist-gopls
           path: dist/*
 
+  clangd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      LLVM_VERSION: "19.1.7"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install NDK
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" "ndk;$NDK_VERSION"
+          test -d "$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+      - name: Fetch LLVM
+        run: git clone --depth 1 --branch "llvmorg-$LLVM_VERSION" https://github.com/llvm/llvm-project.git src
+      - name: Build host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+          cmake -S src/llvm -B host -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
+            -DLLVM_TARGETS_TO_BUILD=Native \
+            -DLLVM_INCLUDE_TESTS=OFF
+          ninja -C host llvm-tblgen clang-tblgen clang-tidy-confusable-chars-gen
+      - name: Configure for Android
+        run: |
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          cmake -S src/llvm -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DLLVM_HOST_TRIPLE=aarch64-linux-android24 \
+            -DLLVM_NATIVE_TOOL_DIR="$PWD/host/bin" \
+            -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
+            -DLLVM_TARGETS_TO_BUILD=AArch64 \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ASSERTIONS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DCLANG_INCLUDE_TESTS=OFF \
+            -DCLANGD_ENABLE_REMOTE=OFF
+      - name: Build clangd
+        run: ninja -C build clangd
+      - name: Package
+        run: |
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr"
+          major="${LLVM_VERSION%%.*}"
+          stage=stage
+          mkdir -p "$stage/bin" "$stage/lib/clang/$major" "$stage/sysroot" dist
+          cp build/bin/clangd "$stage/bin/clangd"
+          cp -r "build/lib/clang/$major/include" "$stage/lib/clang/$major/include"
+          cp -r "$ndk/include" "$stage/sysroot/include"
+          tar -czf "dist/clangd-$LLVM_VERSION-arm64-v8a.tar.gz" -C "$stage" .
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-clangd
+          path: dist/*
+
   publish:
-    needs: [rust, go]
+    needs: [rust, go, clangd]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
