@@ -1,14 +1,15 @@
 {
   "id": "dart",
   "name": "Dart SDK",
-  "description": "Dart language server and formatter",
-  "version": "3.6.0",
+  "description": "Dart SDK: language server, formatter and pub",
+  "version": "0.0.0",
   "languages": [
     "dart"
   ],
   "exec": "bin/dart",
   "env": {
-    "PUB_CACHE": "{data}/tools/pub-cache"
+    "PUB_CACHE": "{data}/tools/pub-cache",
+    "DART_SUPPRESS_ANALYTICS": "true"
   },
   "lsp": {
     "args": [

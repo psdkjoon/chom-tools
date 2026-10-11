@@ -2,8 +2,17 @@
   "id": "lua-language-server",
   "name": "Lua Language Server",
   "description": "Lua language server",
-  "version": "3.13.4",
-  "languages": ["lua"],
+  "version": "0.0.0",
+  "languages": [
+    "lua"
+  ],
   "exec": "bin/lua-language-server",
-  "lsp": {"args": ["--logpath={tmp}", "--metapath={tmp}"]}
+  "lsp": {
+    "args": [
+      "-E",
+      "{tool}/main.lua",
+      "--logpath={tool}/log",
+      "--metapath={tool}/meta"
+    ]
+  }
 }

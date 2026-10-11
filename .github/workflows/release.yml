@@ -103,6 +103,7 @@ jobs:
       - name: Build gopls
         env:
           GOPLS_VERSION: "0.18.1"
+          SHFMT_VERSION: "3.10.0"
         run: |
           mkdir -p dist
           ndk="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -112,6 +113,10 @@ jobs:
             env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" GOPATH="$PWD/gp" \
               go install -buildmode=pie -trimpath -ldflags "-s -w" "golang.org/x/tools/gopls@v$GOPLS_VERSION"
             cp "$(find gp/bin -type f | head -1)" "dist/gopls-$GOPLS_VERSION-$abi"
+            rm -rf "$PWD/gp" && mkdir gp
+            env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" GOPATH="$PWD/gp" \
+              go install -buildmode=pie -trimpath -ldflags "-s -w" "mvdan.cc/sh/v3/cmd/shfmt@v$SHFMT_VERSION"
+            cp "$(find gp/bin -type f | head -1)" "dist/shfmt-$SHFMT_VERSION-$abi"
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -183,8 +188,73 @@ jobs:
           name: dist-clangd
           path: dist/*
 
+  dart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the Dart SDK built for Android
+        run: |
+          version="$(bash scripts/termux-fetch.sh dart deb)"
+          bindart="$(find deb -type f -path '*/lib/dart/bin/dart' | head -1)"
+          if [ -z "$bindart" ]; then bindart="$(find deb -type f -path '*/bin/dart' | head -1)"; fi
+          test -n "$bindart"
+          sdk="$(dirname "$(dirname "$bindart")")"
+          echo "SDK folder: $sdk"
+          ls "$sdk" "$sdk/bin"
+          readelf -d "$bindart" | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          if readelf -d "$bindart" | grep -q 'libc++_shared.so'; then
+            mkdir -p "$sdk/lib"
+            shared="$(find "$ANDROID_HOME/ndk" -name libc++_shared.so -path '*aarch64-linux-android*' | head -1)"
+            test -n "$shared"
+            cp "$shared" "$sdk/lib/"
+          fi
+          mkdir -p dist
+          tar -czf "dist/dart-$version-arm64-v8a.tar.gz" -C "$sdk" .
+          echo "$version" > dist/dart.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-dart
+          path: dist/*
+
+  lua:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch lua-language-server built for Android
+        run: |
+          version="$(bash scripts/termux-fetch.sh lua-language-server deb)"
+          main="$(find deb -type f -name main.lua | head -1)"
+          test -n "$main"
+          bin=""
+          for f in $(find deb -type f -name lua-language-server); do
+            if [ "$(head -c 4 "$f" | tail -c 3)" = "ELF" ]; then bin="$f"; fi
+          done
+          test -n "$bin"
+          mkdir -p stage/bin
+          cp -r "$(dirname "$main")/." stage/
+          cp "$bin" stage/bin/lua-language-server
+          readelf -d stage/bin/lua-language-server | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          if readelf -d stage/bin/lua-language-server | grep -q 'libc++_shared.so'; then
+            mkdir -p stage/lib
+            shared="$(find "$ANDROID_HOME/ndk" -name libc++_shared.so -path '*aarch64-linux-android*' | head -1)"
+            test -n "$shared"
+            cp "$shared" stage/lib/
+          fi
+          ls stage stage/bin
+          mkdir -p dist
+          tar -czf "dist/lua-language-server-$version-arm64-v8a.tar.gz" -C stage .
+          echo "$version" > dist/lua-language-server.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-lua
+          path: dist/*
+
   publish:
-    needs: [rust, go, clangd]
+    needs: [rust, go, clangd, dart, lua]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:

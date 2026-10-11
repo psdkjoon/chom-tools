@@ -1,0 +1,19 @@
+{
+  "id": "shfmt",
+  "name": "shfmt",
+  "description": "Shell script formatter",
+  "version": "3.10.0",
+  "languages": [
+    "bash"
+  ],
+  "exec": "shfmt",
+  "format": {
+    "mode": "stdio",
+    "args": [
+      "-i",
+      "{tab}",
+      "--filename",
+      "{path}"
+    ]
+  }
+}

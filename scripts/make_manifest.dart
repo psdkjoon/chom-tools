@@ -30,7 +30,11 @@ Future<void> main(List<String> args) async {
   for (final file in files) {
     final meta = jsonDecode(await file.readAsString()) as Map<String, Object?>;
     final id = meta['id'] as String;
-    final version = meta['version'] as String;
+    final override = File('dist/$id.version');
+    final version = override.existsSync()
+        ? override.readAsStringSync().trim()
+        : meta['version'] as String;
+    meta['version'] = version;
     final assets = <String, Object?>{};
     for (final abi in abis) {
       for (final ext in ['.tar.gz', '']) {
