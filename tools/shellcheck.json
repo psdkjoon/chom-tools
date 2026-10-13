@@ -1,0 +1,19 @@
+{
+  "id": "shellcheck",
+  "name": "ShellCheck",
+  "description": "Shell script diagnostics with automatic fixes",
+  "version": "0.0.0",
+  "languages": [
+    "bash"
+  ],
+  "exec": "bin/shellcheck",
+  "lint": {
+    "mode": "shellcheck",
+    "args": [
+      "--format=json1",
+      "--shell=bash",
+      "--severity=style",
+      "-"
+    ]
+  }
+}

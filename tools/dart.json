@@ -14,7 +14,8 @@
   "lsp": {
     "args": [
       "language-server",
-      "--protocol=lsp"
+      "--protocol=lsp",
+      "--sdk={tool}"
     ]
   },
   "format": {

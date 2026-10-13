@@ -1,10 +1,13 @@
 {
   "id": "rust-analyzer",
   "name": "rust-analyzer",
-  "description": "Rust language server and formatter",
+  "description": "Rust language server",
   "version": "2024-12-23",
-  "languages": ["rust"],
+  "languages": [
+    "rust"
+  ],
   "exec": "rust-analyzer",
-  "lsp": {"args": []},
-  "format": {"mode": "lsp"}
+  "lsp": {
+    "args": []
+  }
 }

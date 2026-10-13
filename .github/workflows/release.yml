@@ -100,23 +100,23 @@ jobs:
           yes | "$sdkmanager" --licenses >/dev/null || true
           "$sdkmanager" "ndk;$NDK_VERSION"
           test -d "$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
-      - name: Build gopls
+      - name: Build gopls and shfmt
         env:
           GOPLS_VERSION: "0.18.1"
           SHFMT_VERSION: "3.10.0"
         run: |
           mkdir -p dist
           ndk="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          git clone --depth 1 --branch "gopls/v$GOPLS_VERSION" https://github.com/golang/tools.git tools-src
+          git clone --depth 1 --branch "v$SHFMT_VERSION" https://github.com/mvdan/sh.git sh-src
+          cp scripts/android_args.go.txt tools-src/gopls/zz_android_args.go
+          cp scripts/android_args.go.txt sh-src/cmd/shfmt/zz_android_args.go
           for spec in arm64-v8a:arm64:aarch64-linux-android24-clang: armeabi-v7a:arm:armv7a-linux-androideabi24-clang:GOARM=7 x86_64:amd64:x86_64-linux-android24-clang:; do
             IFS=: read -r abi goarch cc extra <<<"$spec"
-            rm -rf "$PWD/gp" && mkdir gp
-            env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" GOPATH="$PWD/gp" \
-              go install -buildmode=pie -trimpath -ldflags "-s -w" "golang.org/x/tools/gopls@v$GOPLS_VERSION"
-            cp "$(find gp/bin -type f | head -1)" "dist/gopls-$GOPLS_VERSION-$abi"
-            rm -rf "$PWD/gp" && mkdir gp
-            env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" GOPATH="$PWD/gp" \
-              go install -buildmode=pie -trimpath -ldflags "-s -w" "mvdan.cc/sh/v3/cmd/shfmt@v$SHFMT_VERSION"
-            cp "$(find gp/bin -type f | head -1)" "dist/shfmt-$SHFMT_VERSION-$abi"
+            (cd tools-src/gopls && env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" \
+              go build -buildmode=pie -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/gopls-$GOPLS_VERSION-$abi" .)
+            (cd sh-src && env GOOS=android GOARCH="$goarch" $extra CGO_ENABLED=1 CC="$ndk/$cc" \
+              go build -buildmode=pie -trimpath -ldflags "-s -w" -o "$GITHUB_WORKSPACE/dist/shfmt-$SHFMT_VERSION-$abi" ./cmd/shfmt)
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -209,7 +209,9 @@ jobs:
             test -n "$shared"
             cp "$shared" "$sdk/lib/"
           fi
-          mkdir -p dist
+          bash scripts/termux-deps.sh dart deps
+          mkdir -p "$sdk/lib" dist
+          cp -a deps/lib/. "$sdk/lib/"
           tar -czf "dist/dart-$version-arm64-v8a.tar.gz" -C "$sdk" .
           echo "$version" > dist/dart.version
           ls -l dist
@@ -243,7 +245,10 @@ jobs:
             test -n "$shared"
             cp "$shared" stage/lib/
           fi
-          ls stage stage/bin
+          bash scripts/termux-deps.sh lua-language-server deps
+          mkdir -p stage/lib
+          cp -a deps/lib/. stage/lib/
+          ls stage stage/bin stage/lib
           mkdir -p dist
           tar -czf "dist/lua-language-server-$version-arm64-v8a.tar.gz" -C stage .
           echo "$version" > dist/lua-language-server.version
@@ -253,8 +258,32 @@ jobs:
           name: dist-lua
           path: dist/*
 
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch shellcheck built for Android
+        run: |
+          version="$(bash scripts/termux-fetch.sh shellcheck deb)"
+          bin="$(find deb -type f -name shellcheck | head -1)"
+          test -n "$bin"
+          mkdir -p stage/bin stage/lib dist
+          cp "$bin" stage/bin/shellcheck
+          bash scripts/termux-deps.sh shellcheck deps
+          cp -a deps/lib/. stage/lib/
+          readelf -d stage/bin/shellcheck | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          ls stage/lib
+          tar -czf "dist/shellcheck-$version-arm64-v8a.tar.gz" -C stage .
+          echo "$version" > dist/shellcheck.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-shellcheck
+          path: dist/*
+
   publish:
-    needs: [rust, go, clangd, dart, lua]
+    needs: [rust, go, clangd, dart, lua, shellcheck]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:

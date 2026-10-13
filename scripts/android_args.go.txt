@@ -1,0 +1,12 @@
+package main
+
+import (
+	"os"
+	"strings"
+)
+
+func init() {
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[0], "/system/bin/linker") {
+		os.Args = os.Args[1:]
+	}
+}

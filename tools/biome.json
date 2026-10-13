@@ -3,8 +3,30 @@
   "name": "Biome",
   "description": "JavaScript, TypeScript, CSS and JSON language server and formatter",
   "version": "1.9.4",
-  "languages": ["javascript", "css", "json"],
+  "languages": [
+    "javascript",
+    "css",
+    "json"
+  ],
   "exec": "biome",
-  "lsp": {"args": ["lsp-proxy"]},
-  "format": {"mode": "stdio", "args": ["format", "--stdin-file-path={path}", "--indent-style=space", "--indent-width={tab}"]}
+  "lsp": {
+    "args": [
+      "lsp-proxy"
+    ],
+    "daemon": {
+      "args": [
+        "__run_server"
+      ],
+      "ready": "biome-socket"
+    }
+  },
+  "format": {
+    "mode": "stdio",
+    "args": [
+      "format",
+      "--stdin-file-path={path}",
+      "--indent-style=space",
+      "--indent-width={tab}"
+    ]
+  }
 }
