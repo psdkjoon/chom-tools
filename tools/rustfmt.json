@@ -1,0 +1,19 @@
+{
+  "id": "rustfmt",
+  "name": "rustfmt",
+  "description": "Rust formatter",
+  "version": "0.0.0",
+  "languages": [
+    "rust"
+  ],
+  "exec": "bin/rustfmt",
+  "format": {
+    "mode": "stdio",
+    "args": [
+      "--edition",
+      "2021",
+      "--config",
+      "tab_spaces={tab},hard_tabs=false"
+    ]
+  }
+}

@@ -24,5 +24,61 @@
       "format",
       "--stdin-name={path}"
     ]
-  }
+  },
+  "commands": [
+    {
+      "label": "pub get",
+      "args": [
+        "pub",
+        "get"
+      ]
+    },
+    {
+      "label": "pub upgrade",
+      "args": [
+        "pub",
+        "upgrade"
+      ]
+    },
+    {
+      "label": "pub outdated",
+      "args": [
+        "pub",
+        "outdated"
+      ]
+    },
+    {
+      "label": "pub deps",
+      "args": [
+        "pub",
+        "deps"
+      ]
+    },
+    {
+      "label": "analyze",
+      "args": [
+        "analyze"
+      ]
+    },
+    {
+      "label": "fix --apply",
+      "args": [
+        "fix",
+        "--apply"
+      ]
+    },
+    {
+      "label": "format .",
+      "args": [
+        "format",
+        "."
+      ]
+    },
+    {
+      "label": "--version",
+      "args": [
+        "--version"
+      ]
+    }
+  ]
 }

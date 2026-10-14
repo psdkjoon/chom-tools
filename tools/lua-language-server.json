@@ -13,6 +13,7 @@
       "{tool}/main.lua",
       "--logpath={tool}/log",
       "--metapath={tool}/meta"
-    ]
+    ],
+    "cwd": "{tool}/bin/run"
   }
 }

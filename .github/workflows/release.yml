@@ -228,16 +228,30 @@ jobs:
       - name: Fetch lua-language-server built for Android
         run: |
           version="$(bash scripts/termux-fetch.sh lua-language-server deb)"
-          main="$(find deb -type f -name main.lua | head -1)"
-          test -n "$main"
+          scriptdir="$(find deb -type d -name script | head -1)"
+          if [ -n "$scriptdir" ]; then
+            root="$(dirname "$scriptdir")"
+          else
+            root="$(dirname "$(find deb -type f -name main.lua | head -1)")"
+          fi
+          test -f "$root/main.lua"
           bin=""
           for f in $(find deb -type f -name lua-language-server); do
             if [ "$(head -c 4 "$f" | tail -c 3)" = "ELF" ]; then bin="$f"; fi
           done
           test -n "$bin"
-          mkdir -p stage/bin
-          cp -r "$(dirname "$main")/." stage/
+          mkdir -p stage/bin stage/bin/run
+          cp -r "$root/." stage/
           cp "$bin" stage/bin/lua-language-server
+          if [ ! -f stage/bin/main.lua ]; then
+            printf '%s\n' \
+              "local dir = debug.getinfo(1, 'S').source:sub(2):gsub('[/\\\\]*[^/\\\\]-\$', '')" \
+              "local main = assert(loadfile(dir .. '/../main.lua'))" \
+              "main('bee.lua')" > stage/bin/main.lua
+          fi
+          echo "occurrences of /proc/self/exe: $(grep -c '/proc/self/exe' stage/bin/lua-language-server || true)"
+          LC_ALL=C sed -i 's#/proc/self/exe#/proc/self/cwd#g' stage/bin/lua-language-server
+          touch stage/bin/run/.keep
           readelf -d stage/bin/lua-language-server | grep -E 'NEEDED|RUNPATH|RPATH' || true
           if readelf -d stage/bin/lua-language-server | grep -q 'libc++_shared.so'; then
             mkdir -p stage/lib
@@ -256,6 +270,32 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist-lua
+          path: dist/*
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch rustfmt built for Android
+        run: |
+          version="$(bash scripts/termux-fetch.sh rust deb)"
+          bin="$(find deb -type f -path '*/usr/bin/rustfmt' | head -1)"
+          test -n "$bin"
+          mkdir -p stage/bin stage/lib dist
+          cp "$bin" stage/bin/rustfmt
+          readelf -d stage/bin/rustfmt | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          cp -L deb/data/data/com.termux/files/usr/lib/librustc_driver-*.so stage/lib/
+          cp -L deb/data/data/com.termux/files/usr/lib/libstd-*.so stage/lib/ || true
+          bash scripts/termux-deps.sh rust deps
+          cp -a deps/lib/. stage/lib/
+          ls -l stage/lib
+          tar -czf "dist/rustfmt-$version-arm64-v8a.tar.gz" -C stage .
+          echo "$version" > dist/rustfmt.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-rustfmt
           path: dist/*
 
   shellcheck:
@@ -282,8 +322,37 @@ jobs:
           name: dist-shellcheck
           path: dist/*
 
+  bash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Package bash-language-server with Node.js built for Android
+        run: |
+          mkdir -p stage/server stage/bin stage/lib dist
+          (cd stage/server && npm init -y >/dev/null && npm install --omit=dev --no-audit --no-fund bash-language-server@5)
+          version="$(node -p "require('./stage/server/node_modules/bash-language-server/package.json').version")"
+          bash scripts/termux-fetch.sh nodejs deb >/dev/null
+          node_bin="$(find deb -type f -path '*/usr/bin/node' | head -1)"
+          test -n "$node_bin"
+          cp "$node_bin" stage/bin/node
+          bash scripts/termux-deps.sh nodejs deps
+          cp -a deps/lib/. stage/lib/
+          readelf -d stage/bin/node | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          ls stage/lib
+          tar -czf "dist/bash-language-server-$version-arm64-v8a.tar.gz" -C stage .
+          echo "$version" > dist/bash-language-server.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-bash
+          path: dist/*
+
   publish:
-    needs: [rust, go, clangd, dart, lua, shellcheck]
+    needs: [rust, go, clangd, dart, lua, shellcheck, bash, rustfmt]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:

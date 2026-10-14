@@ -1,0 +1,19 @@
+{
+  "id": "bash-language-server",
+  "name": "Bash Language Server",
+  "description": "Bash language server: symbols, hover and completion",
+  "version": "0.0.0",
+  "languages": [
+    "bash"
+  ],
+  "exec": "bin/node",
+  "env": {
+    "SHELLCHECK_PATH": ""
+  },
+  "lsp": {
+    "args": [
+      "{tool}/server/node_modules/bash-language-server/out/cli.js",
+      "start"
+    ]
+  }
+}
