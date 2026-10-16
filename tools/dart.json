@@ -34,6 +34,31 @@
       ]
     },
     {
+      "label": "pub add\u2026",
+      "args": [
+        "pub",
+        "add",
+        "{?Package name}"
+      ]
+    },
+    {
+      "label": "pub add --dev\u2026",
+      "args": [
+        "pub",
+        "add",
+        "--dev",
+        "{?Package name}"
+      ]
+    },
+    {
+      "label": "pub remove\u2026",
+      "args": [
+        "pub",
+        "remove",
+        "{?Package name}"
+      ]
+    },
+    {
       "label": "pub upgrade",
       "args": [
         "pub",
@@ -72,6 +97,26 @@
       "args": [
         "format",
         "."
+      ]
+    },
+    {
+      "label": "create\u2026",
+      "args": [
+        "create",
+        "{?Folder name}"
+      ]
+    },
+    {
+      "label": "test",
+      "args": [
+        "test"
+      ]
+    },
+    {
+      "label": "run\u2026",
+      "args": [
+        "run",
+        "{?File or target}"
       ]
     },
     {
