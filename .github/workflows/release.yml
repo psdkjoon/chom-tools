@@ -351,8 +351,44 @@ jobs:
           name: dist-bash
           path: dist/*
 
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Python and pip built for Android
+        run: |
+          prefix=data/data/com.termux/files/usr
+          version="$(bash scripts/termux-fetch.sh python deb)"
+          bash scripts/termux-fetch.sh python-pip pip >/dev/null
+          bash scripts/termux-fetch.sh ca-certificates certs >/dev/null
+          minor="$(basename "$(find "deb/$prefix/lib" -maxdepth 1 -type d -name 'python3.*' | head -1)" | sed 's/^python//')"
+          test -n "$minor"
+          mkdir -p stage/bin stage/lib dist
+          cp -a "deb/$prefix/lib/python$minor" stage/lib/
+          cp -a "pip/$prefix/lib/python$minor/." "stage/lib/python$minor/"
+          cp -L "deb/$prefix/bin/python$minor" "stage/bin/python$minor"
+          cp -L "deb/$prefix/bin/python$minor" stage/bin/python3
+          cp -L deb/$prefix/lib/libpython$minor*.so* stage/lib/
+          cert="$(find certs -name cert.pem | head -1)"
+          test -n "$cert"
+          cp -L "$cert" stage/cert.pem
+          readelf -d "stage/bin/python$minor" | grep -E 'NEEDED|RUNPATH|RPATH' || true
+          bash scripts/termux-deps.sh python deps
+          cp -a deps/lib/. stage/lib/
+          find stage -name __pycache__ -type d -prune -exec rm -rf {} +
+          rm -rf "stage/lib/python$minor/test" "stage/lib/python$minor/idlelib" "stage/lib/python$minor/tkinter" "stage/lib/python$minor/turtledemo"
+          ls stage stage/bin stage/lib
+          tar -czf "dist/python-$version-arm64-v8a.tar.gz" -C stage .
+          echo "$version" > dist/python.version
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-python
+          path: dist/*
+
   publish:
-    needs: [rust, go, clangd, dart, lua, shellcheck, bash, rustfmt]
+    needs: [rust, go, clangd, dart, lua, shellcheck, bash, rustfmt, python]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
